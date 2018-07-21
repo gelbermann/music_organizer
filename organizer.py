@@ -4,8 +4,8 @@ from shutil import move, SameFileError, rmtree
 import pylast
 import urllib.request as request
 
-DIR_PATTERN = '%A/%y - %a'
-FILE_PATTERN = '%tn - %t'
+DIR_DEFAULT = '%A/%y - %a'
+FILE_DEFAULT = '%tn - %t'
 
 
 class FileTags:
@@ -70,7 +70,6 @@ class FileTags:
 			   or not self.track
 
 
-# def organize(dir_path: str, dir_pattern: str = '%A/%y - %a', file_pattern: str = '%tn - %t') -> None:
 def organize(dir_path: str) -> None:
 	"""
 	Applies defined pattern to every directory in given path, every sub-directory,
@@ -81,28 +80,44 @@ def organize(dir_path: str) -> None:
 	:param file_pattern: pattern to apply to media files
 	"""
 
-	dir_pattern = input("Please enter album directory name pattern (press enter to skip): ")
-	dir_pattern = DIR_PATTERN if dir_pattern == "" else dir_pattern
-	file_pattern = input("Please enter track name pattern (press enter to skip): ")
-	file_pattern = FILE_PATTERN if file_pattern == "" else file_pattern
+	dir_pattern, file_pattern = get_patterns()
 
-	abs_path = os.path.abspath(dir_path)
-	for path, dirs, files in os.walk(abs_path):
+	dir_path = os.path.abspath(dir_path)
+	for path, dirs, files in os.walk(dir_path):
 		for file in files:
 			if is_media_file(file):
 				file_path = os.path.join(path, file)
 				tag = generate_tag(file_path)
 				if tag:
 					dir_name = generate_name(tag, dir_pattern)
-					dst_path = create_directory(abs_path, dir_name)
+					dst_path = create_directory(dir_path, dir_name)
 					move_file(file_path, dst_path)
 					if not tag.missing_tag():
 						file_ext = file.split('.')[-1]
-						file_name = "{}.{}".format(generate_name(tag, file_pattern), file_ext)
-						print(tag)
-						print(os.path.join(dst_path, file))
-						print(os.path.join(dst_path, file_name))
-						os.rename(os.path.join(dst_path, file), os.path.join(dst_path, file_name))
+						formatted_name = "{}.{}".format(generate_name(tag, file_pattern), file_ext)
+						formatted_name = os.path.join(dst_path, formatted_name)
+						file_path = os.path.join(dst_path, file)
+						os.rename(file_path, formatted_name)
+
+
+def get_patterns() -> (str, str):
+	"""
+	Displays all necessary messages about name patterns, and asks user for custom patterns.
+
+	:return: tuple made of chosen directory name file name patterns
+	"""
+	print("Parameters for name patterns:", "%A - artist", "%a - album",
+		  "%t - title", "%tn - track number", "%y - year", sep='\n')
+	print()
+	print("Default album directroy pattern: ", DIR_DEFAULT, " (e.g. 'Metallica/1984 - Ride the Lightning')")
+	print("Default file name pattern: ", FILE_DEFAULT, " (e.g. '01 - Fight Fire with Fire')")
+	print()
+
+	dir_pattern = input("Please enter album directory name pattern (press enter to skip): ")
+	dir_pattern = DIR_DEFAULT if dir_pattern == "" else dir_pattern
+	file_pattern = input("Please enter track name pattern (press enter to skip): ")
+	file_pattern = FILE_DEFAULT if file_pattern == "" else file_pattern
+	return dir_pattern, file_pattern
 
 
 def generate_tag(file_path: str) -> FileTags:
@@ -113,15 +128,14 @@ def generate_tag(file_path: str) -> FileTags:
 	:return: FileTags object. If errors occur, returns None.
 	"""
 	_, file_name = os.path.split(file_path)
-	tag = FileTags(None, None, None, None, None)
 
 	try:
 		reader = id3reader.Reader(file_path)
-		tag.artist = reader.get_value('performer')
-		tag.album = reader.get_value('album')
-		tag.year = reader.get_value('year')
-		tag.title = reader.get_value('title')
-		tag.track = reader.get_value('track')
+		tag = FileTags(reader.get_value('performer'),
+					   reader.get_value('album'),
+					   reader.get_value('year'),
+					   reader.get_value('track'),
+					   reader.get_value('title'))
 		if tag.track:
 			tag.track = tag.track.split('/')[0]
 	except id3reader.Id3Error as error:
@@ -202,21 +216,13 @@ def move_file(file_path: str, dst_path: str) -> None:
 	try:
 		move(file_path, dst_path)
 	except SameFileError:
-		# print("[!] File '{}' is already in destination, no action taken.".format(file_name))
 		pass
 	except OSError as error:
-		# print("Error moving file to destination '{}' - "
-		# 	  "destination is inaccessible or not writeable.".format(dst_path))
-		# print(error)
 		print("[ERROR] Could not move file to destination: {}".format(dst_path))
 		print("\t{}".format(error))
 	else:
 		_, tail = os.path.split(file_path)
 		print("[!] File '{}' moved successfully.".format(tail))
-
-
-# def rename_file(file: str, name: str) -> None:
-# 	os.rename(file, name)
 
 
 def clear_remains(dir_path: str) -> None:
@@ -292,6 +298,7 @@ def fetch_album_art(dir_path: str) -> None:
 def main():
 	root = "D:\\CodeProjects\\Python\\music_test_folder"
 	print("*** WARNING! DO NOT CONTINUE BEFORE CLOSING ALL OPEN FILES IN RELEVANT FOLDER! ***")
+	print()
 
 	organize(root)
 	clear_remains(root)
