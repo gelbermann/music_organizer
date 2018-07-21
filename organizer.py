@@ -10,7 +10,7 @@ FILE_DEFAULT = '%tn - %t'
 
 class FileTags:
 	"""
-	Class to represent media file id3 tags.
+	Class to represent audio file id3 tags.
 	"""
 
 	def __init__(self, artist, album, year, track, title):
@@ -73,11 +73,11 @@ class FileTags:
 def organize(dir_path: str) -> None:
 	"""
 	Applies defined pattern to every directory in given path, every sub-directory,
-	and every media file.
+	and every audio file.
 
 	:param dir_path: parent directory path
 	:param dir_pattern: pattern to apply to directories
-	:param file_pattern: pattern to apply to media files
+	:param file_pattern: pattern to apply to audio files
 	"""
 
 	dir_pattern, file_pattern = get_patterns()
@@ -85,7 +85,7 @@ def organize(dir_path: str) -> None:
 	dir_path = os.path.abspath(dir_path)
 	for path, dirs, files in os.walk(dir_path):
 		for file in files:
-			if is_media_file(file):
+			if is_audio_file(file):
 				file_path = os.path.join(path, file)
 				tag = generate_tag(file_path)
 				if tag:
@@ -97,7 +97,15 @@ def organize(dir_path: str) -> None:
 						formatted_name = "{}.{}".format(generate_name(tag, file_pattern), file_ext)
 						formatted_name = os.path.join(dst_path, formatted_name)
 						file_path = os.path.join(dst_path, file)
-						os.rename(file_path, formatted_name)
+						try:
+							os.rename(file_path, formatted_name)
+						except FileExistsError as error:
+							print("[ERROR] Couldn't rename file '{}' as it already exists.".format(formatted_name))
+							print("\t{}".format(error))
+							os.rename(file_path, formatted_name + "_")
+						except OSError as error:
+							print("[ERROR] Couldn't rename file '{}'.".format(formatted_name))
+							print("\t{}".format(error))
 
 
 def get_patterns() -> (str, str):
@@ -109,7 +117,7 @@ def get_patterns() -> (str, str):
 	print("Parameters for name patterns:", "%A - artist", "%a - album",
 		  "%t - title", "%tn - track number", "%y - year", sep='\n')
 	print()
-	print("Default album directroy pattern: ", DIR_DEFAULT, " (e.g. 'Metallica/1984 - Ride the Lightning')")
+	print("Default album directory pattern: ", DIR_DEFAULT, " (e.g. 'Metallica/1984 - Ride the Lightning')")
 	print("Default file name pattern: ", FILE_DEFAULT, " (e.g. '01 - Fight Fire with Fire')")
 	print()
 
@@ -122,7 +130,7 @@ def get_patterns() -> (str, str):
 
 def generate_tag(file_path: str) -> FileTags:
 	"""
-	Generates FileTags object for given media file.
+	Generates FileTags object for given audio file.
 
 	:param file_path: file's full path.
 	:return: FileTags object. If errors occur, returns None.
@@ -143,21 +151,21 @@ def generate_tag(file_path: str) -> FileTags:
 		print("\t{}".format(error))
 		tag = None
 	except Exception as error:
-		print("[ERROR] Unknown error occurred, please investigate.")
+		print("[ERROR] Unknown error occurred reading tags from file: '{}'".format(file_path))
 		print("\t{}".format(error))
 		tag = None
 	return tag
 
 
-def is_media_file(file: str):
+def is_audio_file(file: str):
 	"""
-	Checks if file is one of several common media file types.
+	Checks if file is one of several common audio file types.
 
 	:param file: file name or path
-	:return: True if file is media file, False otherwise
+	:return: True if file is audio file, False otherwise
 	"""
-	extensions = ('mp3', 'mp4', 'wma', 'wmv', 'avi', 'mpg', 'mpeg', 'm3u', 'mid',
-				  'midi', 'wav', 'm4a')
+	extensions = ('mp3', 'mp4', 'wmv', 'mpg', 'mpeg', 'm3u', 'mid',
+				  'midi', 'wav', 'm4a')  # TODO Replace id3reader with more advanced id3 tags reader
 	return file.endswith(extensions)
 
 
@@ -169,13 +177,13 @@ def create_directory(dir_path: str, dir_name: str) -> str:
 	:param dir_name: directory name
 	:return: path for new directory
 	"""
-	new_path = os.path.join(os.path.abspath(dir_path), dir_name)
+	new_path = os.path.join(os.path.abspath(dir_path), dir_name).strip()
 	try:
 		if not os.path.exists(new_path):
 			os.makedirs(new_path)
 			print("[!] Directory '{}' created successfully.".format(dir_name))
-	# else:
-	# 	print('[!] Directory "{}" already exists, no action taken.'.format(dir_name))
+		else:
+			print('[!] Directory "{}" already exists, no action taken.'.format(dir_name))
 	except OSError as error:
 		print("[ERROR] Could not create directory: '{}'".format(os.path.join(dir_path, dir_name)))
 		print("\t{}".format(error))
@@ -199,11 +207,28 @@ def generate_name(tag: FileTags, pattern: str) -> str:
 	"""
 
 	return pattern \
-		.replace('%A', tag.artist.replace('/', '_')) \
-		.replace('%a', tag.album.replace('/', '_')) \
+		.replace('%A', remove_forbidden_chars(tag.artist)) \
+		.replace('%a', remove_forbidden_chars(tag.album)) \
 		.replace('%tn', str(tag.track).zfill(2)) \
-		.replace('%t', tag.title.replace('/', '_')) \
+		.replace('%t', remove_forbidden_chars(tag.title)) \
 		.replace('%y', str(tag.year))
+
+
+def remove_forbidden_chars(string: str) -> str:
+	return string \
+		.replace('*', '_') \
+		.replace('.', '_') \
+		.replace('"', '_') \
+		.replace('\'', '_') \
+		.replace('/', '_') \
+		.replace('[', '_') \
+		.replace(']', '_') \
+		.replace(':', '_') \
+		.replace(';', '_') \
+		.replace('|', '_') \
+		.replace('=', '_') \
+		.replace('?', '_') \
+		.replace(',', '_')
 
 
 def move_file(file_path: str, dst_path: str) -> None:
@@ -228,7 +253,7 @@ def move_file(file_path: str, dst_path: str) -> None:
 def clear_remains(dir_path: str) -> None:
 	"""
 	Deletes every directory that is either empty,
-	or has no media files in it.
+	or has no audio files in it.
 
 	As of now, doesn't handle read-only files.
 	Also has a bug where some directories aren't deleted, but no error is thrown.
@@ -239,8 +264,8 @@ def clear_remains(dir_path: str) -> None:
 	abs_path = os.path.abspath(dir_path)
 	for path, dirs, files in os.walk(abs_path):
 		for directory in dirs:
-			if contains_no_media(os.path.join(path, directory)):
-				# print("[!] Directory {} contains no media".format(directory))
+			if contains_no_audio(os.path.join(path, directory)):
+				# print("[!] Directory {} contains no audio".format(directory))
 				try:
 					# print("trying to delete {}\\{}".format(path, directory))
 					rmtree(os.path.join(path, directory))
@@ -251,18 +276,27 @@ def clear_remains(dir_path: str) -> None:
 					print("[!] Directory '{}' deleted successfully.".format(directory))
 
 
-def contains_no_media(dir_path: str) -> bool:
+def contains_no_audio(dir_path: str) -> bool:
 	"""
-	Checks if directory contains media files.
+	Checks if directory contains audio files.
 
 	:param dir_path: directory path
-	:return: False if contains media files, True otherwise
+	:return: False if contains audio files, True otherwise
 	"""
-	for item in os.listdir(dir_path):
-		item_path = os.path.join(dir_path, item)
-		if (os.path.isfile(item_path) and is_media_file(item_path)) \
-				or os.path.isdir(item_path):
-			return False
+	# for item in os.listdir(dir_path):
+	# 	item_path = os.path.join(dir_path, item)
+	# 	# if (os.path.isfile(item_path) and is_audio_file(item_path)) \
+	# 	# 		or os.path.isdir(item_path):
+	# 	# 	return False
+	# 	if os.path.isfile(item_path) and is_audio_file(item_path):
+	# 		return False
+	# 	elif os.path.isdir(item_path):
+	# 		return contains_no_audio()
+	# return True
+	for path, dirs, files in os.walk(dir_path):
+		for file in files:
+			if is_audio_file(os.path.join(path, file)):
+				return False
 	return True
 
 
@@ -272,10 +306,17 @@ def fetch_album_art(dir_path: str) -> None:
 
 	:param dir_path: directory path
 	"""
+	print()
+	fetch = input("Do you want to download album art for all albums? [Y/N]: ")
+	if fetch.lower() == 'n':
+		return
+	else:
+		print()
+
 	network = pylast.LastFMNetwork(api_key='d43c497febfef4ba166a51eca0932b90',  # TODO try catch?
 								   api_secret='1ce6e93f6e2c1329262484f41901ad2c')  # source code doesn't seem to require
 	for path, dirs, files in os.walk(dir_path):
-		if not contains_no_media(path) and (files[0] if files else None) \
+		if not contains_no_audio(path) and (files[0] if files else None) \
 				and "cover_art.jpg" not in files:
 			tag = generate_tag(os.path.join(path, files[0]))
 			if tag:
@@ -288,15 +329,16 @@ def fetch_album_art(dir_path: str) -> None:
 					print("[ERROR] Could not download album art for:\t'{}'".format(tag))
 					print("\t{}".format(error))
 				except Exception as error:
-					print("[ERROR] Unknown error occurred, please investigate.")
+					print("[ERROR] Unknown error occurred while retrieving album art for:")
 					print("\t{}".format(tag))
 					print("\t{}".format(error))
 				else:
-					print("[!] Album art successfully retrieved for {}".format(tag))
+					print("[!] Album art successfully retrieved for:\t{}".format(tag))
 
 
 def main():
-	root = "D:\\CodeProjects\\Python\\music_test_folder"
+	# root = "D:/Niv/Music"
+	root = "D:\CodeProjects\Python\music_test_folder"
 	print("*** WARNING! DO NOT CONTINUE BEFORE CLOSING ALL OPEN FILES IN RELEVANT FOLDER! ***")
 	print()
 
