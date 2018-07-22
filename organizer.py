@@ -70,7 +70,8 @@ class FileTags:
 			   or not self.track
 
 
-def organize(dir_path: str) -> None:
+# def organize(dir_path: str) -> None:
+def organize(dir_path: str, dir_pattern: str = "", file_pattern: str = "", script: bool = False) -> int:
 	"""
 	Applies defined pattern to every directory in given path, every sub-directory,
 	and every audio file.
@@ -78,9 +79,14 @@ def organize(dir_path: str) -> None:
 	:param dir_path: parent directory path
 	:param dir_pattern: pattern to apply to directories
 	:param file_pattern: pattern to apply to audio files
+	:param script: whether function is run from script or from GUI
+	:return: yields percent of files organized
 	"""
+	if script:
+		dir_pattern, file_pattern = get_patterns()
 
-	dir_pattern, file_pattern = get_patterns()
+	total_files = sum([len(files) for path, dirs, files in os.walk(dir_path)])
+	files_done = 0
 
 	dir_path = os.path.abspath(dir_path)
 	for path, dirs, files in os.walk(dir_path):
@@ -106,6 +112,8 @@ def organize(dir_path: str) -> None:
 						except OSError as error:
 							print("[ERROR] Couldn't rename file '{}'.".format(formatted_name))
 							print("\t{}".format(error))
+			files_done += 1
+			yield files_done * 100 // total_files  # percent of files covered out of all files
 
 
 def get_patterns() -> (str, str):
@@ -215,11 +223,11 @@ def generate_name(tag: FileTags, pattern: str) -> str:
 
 
 def remove_forbidden_chars(string: str) -> str:
+	# .replace('\'', '_') \
 	return string \
 		.replace('*', '_') \
 		.replace('.', '_') \
 		.replace('"', '_') \
-		.replace('\'', '_') \
 		.replace('/', '_') \
 		.replace('[', '_') \
 		.replace(']', '_') \
@@ -283,16 +291,6 @@ def contains_no_audio(dir_path: str) -> bool:
 	:param dir_path: directory path
 	:return: False if contains audio files, True otherwise
 	"""
-	# for item in os.listdir(dir_path):
-	# 	item_path = os.path.join(dir_path, item)
-	# 	# if (os.path.isfile(item_path) and is_audio_file(item_path)) \
-	# 	# 		or os.path.isdir(item_path):
-	# 	# 	return False
-	# 	if os.path.isfile(item_path) and is_audio_file(item_path):
-	# 		return False
-	# 	elif os.path.isdir(item_path):
-	# 		return contains_no_audio()
-	# return True
 	for path, dirs, files in os.walk(dir_path):
 		for file in files:
 			if is_audio_file(os.path.join(path, file)):
@@ -300,21 +298,27 @@ def contains_no_audio(dir_path: str) -> bool:
 	return True
 
 
-def fetch_album_art(dir_path: str) -> None:
+def fetch_album_art(dir_path: str, script=False) -> int:
 	"""
 	Downloads album art for all albums in given directory, and all its sub-directories.
 
 	:param dir_path: directory path
+	:param script: whether function is run from script or from GUI
+	:return: yields percent of files organized
 	"""
-	print()
-	fetch = input("Do you want to download album art for all albums? [Y/N]: ")
-	if fetch.lower() == 'n':
-		return
-	else:
+	if script:
 		print()
+		fetch = input("Do you want to download album art for all albums? [Y/N]: ")
+		if fetch.lower() == 'n':
+			return
+		else:
+			print()
 
-	network = pylast.LastFMNetwork(api_key='d43c497febfef4ba166a51eca0932b90',  # TODO try catch?
-								   api_secret='1ce6e93f6e2c1329262484f41901ad2c')  # source code doesn't seem to require
+	total_files = sum([len(files) for path, dirs, files in os.walk(dir_path)])
+	files_done = 0
+
+	network = pylast.LastFMNetwork(api_key='d43c497febfef4ba166a51eca0932b90',
+								   api_secret='1ce6e93f6e2c1329262484f41901ad2c')
 	for path, dirs, files in os.walk(dir_path):
 		if not contains_no_audio(path) and (files[0] if files else None) \
 				and "cover_art.jpg" not in files:
@@ -334,6 +338,8 @@ def fetch_album_art(dir_path: str) -> None:
 					print("\t{}".format(error))
 				else:
 					print("[!] Album art successfully retrieved for:\t{}".format(tag))
+		files_done += 1
+		yield files_done * 100 // total_files
 
 
 def main():
@@ -342,7 +348,7 @@ def main():
 	print("*** WARNING! DO NOT CONTINUE BEFORE CLOSING ALL OPEN FILES IN RELEVANT FOLDER! ***")
 	print()
 
-	organize(root)
+	organize(root, script=True)
 	clear_remains(root)
 	fetch_album_art(root)
 
