@@ -79,9 +79,6 @@ def fetch_art():
 
 
 def update_muspy():
-	# label_status.grid()
-	# status.set("Under development...")
-	#
 	# api_url = 'https://muspy.com/api/1/artists'
 	# # api_endpoint = 'artists/'
 	#
@@ -93,6 +90,10 @@ def update_muspy():
 	# Relevant links: https://www.one-tab.com/page/6tYsdNNDQA2tFhg7kkaNvw
 	# Best bet is to imitate the way beets use the muspy API, since on its own
 	# its documentation is bare and I can't seem to get it to work.
+	progress_bar.grid_remove()
+	label_status.grid()
+	status.set("Under development...")
+
 
 if __name__ == '__main__':
 	root = tkinter.Tk()
