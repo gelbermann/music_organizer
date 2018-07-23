@@ -1,5 +1,5 @@
 import os
-from organizer.tinytag import TinyTag, TinyTagException
+from music_organizer.tinytag import TinyTag, TinyTagException
 from shutil import move, SameFileError, rmtree
 import pylast
 import urllib.request as request
