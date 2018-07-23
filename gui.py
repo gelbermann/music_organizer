@@ -1,9 +1,23 @@
 import tkinter
 from tkinter import ttk
 import organizer
+from queue import Queue, Empty
+from threading import Thread
 
 
-# import requests
+class DownloadWorker(Thread):
+	DONE = 'DONE'
+
+	def __init__(self, queue):
+		super().__init__()
+		self.queue = queue
+
+	def run(self):
+		dir_path = self.queue.get()
+		for percent in organizer.fetch_album_art(dir_path, self.queue):
+			self.queue.put(percent)
+		self.queue.task_done()
+		self.queue.put('DONE')
 
 
 def organize():
@@ -53,18 +67,36 @@ def entries_valid(dir_path, *args):
 
 
 def fetch_art():
-	# TODO move fetching itself to different thread
+	def check_queue():
+		try:
+			percent = queue.get_nowait()
+		except Empty:
+			root.after(100, check_queue)
+		else:
+			if percent == DownloadWorker.DONE:
+				status.set("Done!")
+				update_progress_bar(100)
+			else:
+				update_progress_bar(percent)
+				root.after(100, check_queue)
+
+	# set up GUI and variables for fetching operation
 	dir_path = entry_path.get().strip()
 	if not entries_valid(dir_path):
 		return
-
 	status.set("Fetching album art...")
 	progress_bar.grid()
-	for percent in organizer.fetch_album_art(dir_path):
-		update_progress_bar(percent)
 
-	status.set("Done!")
-	update_progress_bar(100)
+	# create separate thread for image downloading
+	# to prevent GUI from freezing
+	queue = Queue()
+	worker = DownloadWorker(queue)
+	worker.daemon = True
+	worker.start()
+
+	# begin thread work
+	queue.put(dir_path)
+	root.after(200, check_queue)
 
 
 def update_muspy():
@@ -79,6 +111,8 @@ def update_muspy():
 	# Relevant links: https://www.one-tab.com/page/6tYsdNNDQA2tFhg7kkaNvw
 	# Best bet is to imitate the way beets use the muspy API, since on its own
 	# its documentation is bare and I can't seem to get it to work.
+
+	# temporary user notice
 	progress_bar.grid_remove()
 	label_status.grid()
 	status.set("Under development...")
@@ -141,8 +175,6 @@ if __name__ == '__main__':
 	entry_file_pattern.insert(0, organizer.FILE_DEFAULT)
 	entry_file_pattern.grid(row=1, column=1, sticky='ew', pady=(10, 0), padx=(0, 20))
 
-	# TODO remove default path
-	# TODO replace with browse button
 	entry_path = tkinter.Entry(frame_entries)
 	entry_path.insert(0, "D:\CodeProjects\Python\music_test_folder")
 	entry_path.grid(row=2, column=1, sticky='ew', pady=(10, 10), padx=(0, 20))
