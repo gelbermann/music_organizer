@@ -3,6 +3,8 @@ from tinytag import TinyTag, TinyTagException
 from shutil import move, SameFileError, rmtree
 import pylast
 import urllib.request as request
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 
 DIR_DEFAULT = '%A/%y - %a'
 FILE_DEFAULT = '%tn - %t'
@@ -50,7 +52,7 @@ def organize(dir_path: str, dir_pattern: str = "", file_pattern: str = "", scrip
 							print("[ERROR] Couldn't rename file '{}'.".format(formatted_name))
 							print("\t{}".format(error))
 			files_done += 1
-			yield files_done * 100 // total_files  # percent of files covered out of all files
+			yield files_done * 100 / total_files  # percent of files covered out of all files
 
 
 def missing_tags(tag) -> bool:
@@ -257,32 +259,100 @@ def fetch_album_art(dir_path: str, script=False) -> int:
 		else:
 			print()
 
-	total_files = sum([len(files) for path, dirs, files in os.walk(dir_path)])
-	files_done = 0
+	# total_files = sum([len(files) for path, dirs, files in os.walk(dir_path)])
+	# files_done = 0
+	images_data = []
+	total_actions = 0
 
+	# # TODO replace with generator
+	# network = pylast.LastFMNetwork(api_key='d43c497febfef4ba166a51eca0932b90',
+	# 							   api_secret='1ce6e93f6e2c1329262484f41901ad2c')
+	# for path, dirs, files in os.walk(dir_path):
+	# 	# if not contains_no_audio(path) and (files[0] if files else None) \ # TODO test changes
+	# 	# if not contains_no_audio(path) and [file for file in files if is_audio_file(file)][0] \
+	# 	# 				and "cover_art.jpg" not in files:
+	# 	if not contains_no_audio(path) and "cover_art.jpg" not in files:
+	# 		file = [file for file in files if is_audio_file(file)][0] if files else None  # get first audio file
+	# 		if file:
+	# 			# tag = generate_tag(os.path.join(path, files[0]))
+	# 			tag = generate_tag(os.path.join(path, file))
+	# 			if tag:
+	# 				try:
+	# 					album = network.get_album(tag.artist, tag.album)
+	# 					image_url = album.get_cover_image()  # by default returns 300x300 sized image
+	# 					image_url = image_url.replace('300x300', '600x600')
+	# 					# create tuple and add to image_urls list. tuple structure: (final image path, image url)
+	# 					images_data.append((image_url, os.path.join(path, "cover_art.jpg"), tag))
+	# 					# request.urlretrieve(image_url, os.path.join(path, "cover_art.jpg"))
+	# 					total_actions += 1
+	# 				except (pylast.MalformedResponseError, pylast.NetworkError) as error:
+	# 					print("[ERROR] Could not download album art for:\t'{}'".format(tag))
+	# 					print("\t{}\t{}".format(error.__class__, error))
+	# 				except Exception as error:
+	# 					print("[ERROR] Unknown error occurred while retrieving album art for:")
+	# 					print("\t{}".format(tag))
+	# 					print("\t{}".format(error))
+	# 				# else:
+	# 				# 	print("[!] Album art successfully retrieved for:\t{}".format(tag))
+	# 	# files_done += len(files)
+	# 	# yield files_done * 100 / total_files
+
+	# for path, url in images_data:
+	# 	print("path: {}".format(path))
+	# 	print("url: {}".format(url))
+	done = 0
+	for url, path, tag in get_image_urls(dir_path):  # TODO call generator
+		if issubclass(type(url), Exception): # if url is an error object
+				print("[ERROR] Could not download album art for:\t'{}'".format(tag))
+				print("\t{}\t{}".format(url.__class__, url))
+		else:
+			try:
+				# print("trying to download '{}'".format(path))
+				request.urlretrieve(url, path)
+			except (pylast.MalformedResponseError, pylast.NetworkError) as error:
+				print("[ERROR] Could not download album art for:\t'{}'".format(path))
+				print("\t{}".format(error))
+			except Exception as error:
+				print("[ERROR] Unknown error occurred while retrieving album art for:")
+				print("\t{}".format(path))
+				print("\t{}\t{}".format(error.__class__, error))
+			else:
+				print("[!] Album art successfully retrieved for:\t{}".format(path))
+		done += 1
+		# yield done * 100 / total_actions # TODO make it work
+
+
+def get_image_urls(dir_path: str) -> str:
 	network = pylast.LastFMNetwork(api_key='d43c497febfef4ba166a51eca0932b90',
 								   api_secret='1ce6e93f6e2c1329262484f41901ad2c')
+	dir_path = os.path.abspath(dir_path)
 	for path, dirs, files in os.walk(dir_path):
-		if not contains_no_audio(path) and (files[0] if files else None) \
-				and "cover_art.jpg" not in files: # TODO change to picking the first audio file
-			tag = generate_tag(os.path.join(path, files[0]))
-			if tag:
-				try:
-					album = network.get_album(tag.artist, tag.album)
-					image_url = album.get_cover_image()  # by default returns 300x300 sized image
-					image_url = image_url.replace('300x300', '600x600')
-					request.urlretrieve(image_url, os.path.join(path, "cover_art.jpg"))
-				except (pylast.MalformedResponseError, pylast.NetworkError) as error:
-					print("[ERROR] Could not download album art for:\t'{}'".format(tag))
-					print("\t{}".format(error))
-				except Exception as error:
-					print("[ERROR] Unknown error occurred while retrieving album art for:")
-					print("\t{}".format(tag))
-					print("\t{}".format(error))
-				else:
-					print("[!] Album art successfully retrieved for:\t{}".format(tag))
-		files_done += len(files)
-		yield files_done * 100 // total_files
+		if not contains_no_audio(path) and "cover_art.jpg" not in files:
+			file = [file for file in files if is_audio_file(file)][0] if files else None  # get first audio file
+			if file:
+				tag = generate_tag(os.path.join(path, file))
+				if tag:
+					try:
+						album = network.get_album(tag.artist, tag.album)
+						image_url = album.get_cover_image()  # by default returns 300x300 sized image
+						image_url = image_url.replace('300x300', '600x600')
+						# total_actions += 1
+					# except (pylast.MalformedResponseError, pylast.NetworkError) as error:
+					# 	print("[ERROR] Could not download album art for:\t'{}'".format(tag))
+					# 	print("\t{}\t{}".format(error.__class__, error))
+					# 	yield (None, os.path.join(path, "cover_art.jpg"), tag)
+					except Exception as error:
+						# print("[ERROR] Unknown error occurred while retrieving album art for:")
+						# print("\t{}".format(tag))
+						# print("\t{}".format(error))
+						yield (error, path, tag)
+					else:
+						# yield tuple. tuple structure: (image url, final image path, album tags)
+						yield (image_url, os.path.join(path, "cover_art.jpg"), tag)
+				# else:
+				# 	print("[!] Album art successfully retrieved for:\t{}".format(tag))
+	# files_done += len(files)
+	# yield files_done * 100 / total_files
 
 
 def main():

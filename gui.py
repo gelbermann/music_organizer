@@ -149,7 +149,7 @@ if __name__ == '__main__':
 
 	# ======== Buttons ========
 
-	progress = tkinter.IntVar()
+	progress = tkinter.DoubleVar()
 	progress_bar = ttk.Progressbar(root, orient=tkinter.HORIZONTAL, variable=progress, maximum=100)
 	progress_bar.grid(row=5, column=1, sticky='ew', padx=20)
 	progress_bar.grid_remove()
