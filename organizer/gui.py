@@ -1,10 +1,9 @@
-try:
-	import tkinter
-except ImportError:  # enable python 2
-	import Tkinter as tkinter
+import tkinter
 from tkinter import ttk
-import organizer
-import requests
+from organizer import organizer
+
+
+# import requests
 
 
 def organize():
@@ -12,16 +11,6 @@ def organize():
 	file_pattern = entry_file_pattern.get().strip()
 	dir_path = entry_path.get().strip()
 
-	# label_status.grid()
-	# if dir_path == "" or dir_pattern == "" or file_pattern == "":
-	# 	status.set("Cannot use empty pattern or path.")
-	# 	return
-	# elif not organizer.os.path.isdir(dir_path):
-	# 	status.set("Path is not a directory, or is invalid.")
-	# 	return
-	# elif organizer.contains_no_audio(dir_path):
-	# 	status.set("Path contains no audio files! Are you sure you got the correct path?")
-	# 	return
 	if not entries_valid(dir_path, dir_pattern, file_pattern):
 		return
 

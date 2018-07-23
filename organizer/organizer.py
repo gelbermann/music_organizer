@@ -1,75 +1,11 @@
 import os
-# import id3reader_p3 as id3reader
-from tinytag import TinyTag, TinyTagException
+from organizer.tinytag import TinyTag, TinyTagException
 from shutil import move, SameFileError, rmtree
 import pylast
 import urllib.request as request
 
 DIR_DEFAULT = '%A/%y - %a'
 FILE_DEFAULT = '%tn - %t'
-
-
-# class FileTags:
-# 	"""
-# 	Class to represent audio file id3 tags.
-# 	The only reason for this class' existence is to handle missing tags.
-# 	"""
-#
-# 	def __init__(self, artist, album, year, track, title):
-# 		self._artist = artist if artist else "Various Artists"
-# 		self._album = album if album else "Untitled Album"
-# 		self._year = year if year else "yyyy"
-# 		self._title = title if title else "Untitled"
-# 		self.track = track
-#
-# 	def __str__(self):
-# 		return "Artist: '{}', Album: '{}', Year: '{}', Title: '{}', Track: {}".format(self._artist, self._album,
-# 																					  self._year, self._title,
-# 																					  self.track)
-#
-# 	"""
-# 	This class uses getters and setters to prevent any of its attributes
-# 	from being set to None.
-# 	"""
-#
-# 	@property
-# 	def artist(self):
-# 		return self._artist
-#
-# 	@artist.setter
-# 	def artist(self, artist):
-# 		self._artist = artist if artist else "Various Artists"
-#
-# 	@property
-# 	def album(self):
-# 		return self._album
-#
-# 	@album.setter
-# 	def album(self, album):
-# 		self._album = album if album else "Untitled Album"
-#
-# 	@property
-# 	def year(self):
-# 		return self._year
-#
-# 	@year.setter
-# 	def year(self, year):
-# 		self._year = year if year else "yyyy"
-#
-# 	@property
-# 	def title(self):
-# 		return self._title
-#
-# 	@title.setter
-# 	def title(self, title):
-# 		self._title = title if title else "Untitled"
-#
-# 	def missing_tag(self):
-# 		return not self._artist or self._artist == "Various Artists" \
-# 			   or not self._album or self.album == "Untitled Album" \
-# 			   or not self._year or self._year == "yyyy" \
-# 			   or not self._title or self._title == "Untitled" \
-# 			   or not self.track
 
 
 def organize(dir_path: str, dir_pattern: str = "", file_pattern: str = "", script: bool = False) -> int:
@@ -99,7 +35,6 @@ def organize(dir_path: str, dir_pattern: str = "", file_pattern: str = "", scrip
 					dir_name = generate_name(tag, dir_pattern)
 					dst_path = create_directory(dir_path, dir_name)
 					move_file(file_path, dst_path)
-					# if not tag.missing_tag():
 					if not missing_tags(tag):
 						file_ext = file.split('.')[-1]
 						formatted_name = "{}.{}".format(generate_name(tag, file_pattern), file_ext)
@@ -110,7 +45,7 @@ def organize(dir_path: str, dir_pattern: str = "", file_pattern: str = "", scrip
 						except FileExistsError as error:
 							print("[ERROR] Couldn't rename file '{}' as it already exists.".format(formatted_name))
 							print("\t{}".format(error))
-							# os.rename(file_path, file)
+						# os.rename(file_path, file)
 						except OSError as error:
 							print("[ERROR] Couldn't rename file '{}'.".format(formatted_name))
 							print("\t{}".format(error))
@@ -119,6 +54,12 @@ def organize(dir_path: str, dir_pattern: str = "", file_pattern: str = "", scrip
 
 
 def missing_tags(tag) -> bool:
+	"""
+	Checks whether any of the important tags are missing from a tags object.
+
+	:param tag: tags object
+	:return: True if 'artist', 'album', 'year', 'track' or 'title' tag is missing. False otherwise.
+	"""
 	return tag.artist is not None \
 		   and tag.album is not None \
 		   and tag.year is not None \
@@ -154,26 +95,6 @@ def generate_tag(file_path: str):
 	:return: tags object. If errors occur, returns None.
 	"""
 	_, file_name = os.path.split(file_path)
-
-	# try:
-	# 	reader = id3reader.Reader(file_path)
-	# 	tag = FileTags(reader.get_value('performer'),
-	# 				   reader.get_value('album'),
-	# 				   reader.get_value('year'),
-	# 				   reader.get_value('track'),
-	# 				   reader.get_value('title'))
-	# 	if tag.track:
-	# 		tag.track = tag.track.split('/')[0]
-	# except id3reader.Id3Error as error:
-	# 	print("[ERROR] Couldn't read tags from file: '{}'".format(file_name))
-	# 	print("\t{}".format(error))
-	# 	tag = None
-	# except Exception as error:
-	# 	print("[ERROR] Unknown error occurred reading tags from file: '{}'".format(file_path))
-	# 	print("\t{}".format(error))
-	# 	tag = None
-	# return tag
-
 	try:
 		tag = TinyTag.get(file_path)
 	except TinyTagException as error:
@@ -294,9 +215,7 @@ def clear_remains(dir_path: str) -> None:
 	for path, dirs, files in os.walk(abs_path):
 		for directory in dirs:
 			if contains_no_audio(os.path.join(path, directory)):
-				# print("[!] Directory {} contains no audio".format(directory))
 				try:
-					# print("trying to delete {}\\{}".format(path, directory))
 					rmtree(os.path.join(path, directory))
 				except Exception as error:
 					print("[ERROR] Could not delete directory: '{}'".format(directory))
