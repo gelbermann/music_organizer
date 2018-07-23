@@ -1,5 +1,5 @@
 import os
-from music_organizer.tinytag import TinyTag, TinyTagException
+from tinytag import TinyTag, TinyTagException
 from shutil import move, SameFileError, rmtree
 import pylast
 import urllib.request as request
@@ -29,7 +29,7 @@ def organize(dir_path: str, dir_pattern: str = "", file_pattern: str = "", scrip
 	for path, dirs, files in os.walk(dir_path):
 		for file in files:
 			if is_audio_file(file):
-				file_path = os.path.join(path, file)
+				file_path = os.path.join(path, file).replace('\0', '')
 				tag = generate_tag(file_path)
 				if tag:
 					dir_name = generate_name(tag, dir_pattern)
@@ -38,7 +38,7 @@ def organize(dir_path: str, dir_pattern: str = "", file_pattern: str = "", scrip
 					if not missing_tags(tag):
 						file_ext = file.split('.')[-1]
 						formatted_name = "{}.{}".format(generate_name(tag, file_pattern), file_ext)
-						formatted_name = os.path.join(dst_path, formatted_name)
+						formatted_name = os.path.join(dst_path, formatted_name.replace('\0', ''))
 						file_path = os.path.join(dst_path, file)
 						try:
 							os.rename(file_path, formatted_name)
@@ -128,14 +128,15 @@ def create_directory(dir_path: str, dir_name: str) -> str:
 	:param dir_name: directory name
 	:return: path for new directory
 	"""
-	new_path = os.path.join(os.path.abspath(dir_path), dir_name).strip()
+	new_path = os.path.join(os.path.abspath(dir_path), dir_name).split('\0')[0]
 	try:
 		if not os.path.exists(new_path):
 			os.makedirs(new_path)
 			print("[!] Directory '{}' created successfully.".format(dir_name))
 		else:
 			print('[!] Directory "{}" already exists, no action taken.'.format(dir_name))
-	except OSError as error:
+	except (OSError, ValueError) as error:
+		# print(r'%s' % os.path.join(dir_path, dir_name))
 		print("[ERROR] Could not create directory: '{}'".format(os.path.join(dir_path, dir_name)))
 		print("\t{}".format(error))
 	return new_path
@@ -189,7 +190,9 @@ def move_file(file_path: str, dst_path: str) -> None:
 	:param dst_path: destination directory's path, as string
 	"""
 	try:
-		move(file_path, dst_path)
+		# print(file_path)
+		# print(dst_path)
+		move(file_path, dst_path.strip())
 	except SameFileError:
 		pass
 	except OSError as error:
@@ -261,7 +264,7 @@ def fetch_album_art(dir_path: str, script=False) -> int:
 								   api_secret='1ce6e93f6e2c1329262484f41901ad2c')
 	for path, dirs, files in os.walk(dir_path):
 		if not contains_no_audio(path) and (files[0] if files else None) \
-				and "cover_art.jpg" not in files:
+				and "cover_art.jpg" not in files: # TODO change to picking the first audio file
 			tag = generate_tag(os.path.join(path, files[0]))
 			if tag:
 				try:

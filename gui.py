@@ -1,6 +1,6 @@
 import tkinter
 from tkinter import ttk
-from organizer import organizer
+import organizer
 
 
 # import requests
