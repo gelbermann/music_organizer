@@ -1,14 +1,17 @@
 import tkinter
 from tkinter import ttk
+from tkinter import filedialog
 import organizer
 from queue import Queue, Empty
-from threading import Thread, current_thread
+from threading import Thread
+from platform import system
+from os import getlogin
+from os.path import isdir
 
 DONE = 'DONE'
 
 
 # TODO consider using parallel workers to speed things up. Would it work, considering their task is an ordered one?
-# TODO is it possible to merge 2 worker classes? I think so: https://stackoverflow.com/questions/15540194/python-how-do-i-notify-that-a-thread-has-finished-to-another-class
 class OrganizeWorker(Thread):
 	def __init__(self, queue, callback=None, callback_args=None):
 		super().__init__()
@@ -19,10 +22,8 @@ class OrganizeWorker(Thread):
 	def run(self):
 		dir_path, dir_pattern, file_pattern = self.queue.get()
 		for percent in organizer.organize(dir_path, dir_pattern, file_pattern):
-			# self.queue.put(percent)
 			update_progress_bar(percent)  # should worker thread be able to affect GUI thread?
 		self.queue.task_done()
-		# self.queue.put('DONE')
 		if self.callback is not None:
 			self.callback(self.callback_args)
 
@@ -36,15 +37,21 @@ class DownloadWorker(Thread):
 		dir_path = self.queue.get()
 		for percent in organizer.fetch_album_art(dir_path):
 			update_progress_bar(percent)
+			print(percent)
 		self.queue.task_done()
+		status.set("Done!")
+		update_progress_bar(100)
+		toggle_interactables()
 
 
-def organize():
+def organize(dir_path: str):
+	toggle_interactables()
 	dir_pattern = entry_album_pattern.get().strip()
 	file_pattern = entry_file_pattern.get().strip()
-	dir_path = entry_path.get().strip()
+	# dir_path = entry_path.get().strip()
 
 	if not entries_valid(dir_path, dir_pattern, file_pattern):
+		toggle_interactables()
 		return
 
 	queue = Queue()
@@ -66,6 +73,7 @@ def clean(dir_path: str):
 
 	status.set("Done!")
 	update_progress_bar(100)
+	toggle_interactables()
 
 
 def update_progress_bar(percent: int):
@@ -73,7 +81,7 @@ def update_progress_bar(percent: int):
 	progress_bar.update()
 
 
-def entries_valid(dir_path, *args):
+def entries_valid(dir_path: str, *args):
 	label_status.grid()
 	for arg in args:
 		if arg == "":
@@ -82,19 +90,22 @@ def entries_valid(dir_path, *args):
 	if dir_path == "":
 		status.set("Cannot use empty pattern or path.")
 		return False
+	# TODO remove cases:
 	elif not organizer.os.path.isdir(dir_path):
 		status.set("Path is not a directory, or is invalid.")
 		return False
 	elif organizer.contains_no_audio(dir_path):
-		status.set("Path contains no audio files! Are you sure you got the correct path?")
+		status.set("Directory contains no audio files! Are you sure you got the correct path?")
 		return False
 	return True
 
 
-def fetch_art():
+def fetch_art(dir_path: str):
 	# set up GUI and variables for fetching operation
-	dir_path = entry_path.get().strip()
+	toggle_interactables()
+	# dir_path = entry_path.get().strip()
 	if not entries_valid(dir_path):
+		toggle_interactables()
 		return
 	status.set("Fetching album art...")
 	progress_bar.grid()
@@ -108,7 +119,6 @@ def fetch_art():
 
 	# begin thread work
 	queue.put(dir_path)
-	# root.after(100, check_queue, queue)
 
 
 def check_queue(queue: Queue, delay: int = 100):
@@ -144,6 +154,28 @@ def update_muspy():
 	status.set("Under development...")
 
 
+def toggle_interactables():
+	interactables = [entry_album_pattern, entry_file_pattern,
+					 btn_browse, btn_organize, btn_fetch_art, btn_update_muspy]
+	for intr in interactables:
+		if intr['state'] == 'normal':
+			intr.config(state=tkinter.DISABLED)
+		else:
+			intr.config(state=tkinter.NORMAL)
+
+
+def browse(dir_path: tkinter.StringVar):
+	user_selection = filedialog.askdirectory(
+		# possible alternatives to os.getlogin:
+		# os.getenv('USERNAME') OR os.getenv('USER') OR os.getenv('LOGNAME')
+		initialdir='/home' if system() == 'Linux' else (
+			dir_path.get() if dir_path.get() else 'C:/Users/{}/Desktop'.format(getlogin())),
+		title="Select library directory",
+	)
+	if isdir(user_selection):
+		dir_path.set(user_selection)
+
+
 if __name__ == '__main__':
 	root = tkinter.Tk()
 	root.title("Music Library Organizer")
@@ -157,12 +189,10 @@ if __name__ == '__main__':
 	frame_entries = tkinter.Frame(root)
 	frame_entries.grid(row=2, column=1, sticky='nsew', padx=20)
 	frame_entries.config(border=1, relief='sunken')
-	frame_entries.grid_columnconfigure(1, weight=1)
-	# frame_entries.grid_columnconfigure(2, weight=1)
+	frame_entries.grid_columnconfigure(2, weight=1)
 
 	frame_buttons = tkinter.Frame(root)
 	frame_buttons.grid(row=4, column=1, sticky='nsew', padx=20, pady=20)
-	# frame_buttons.config(border=2, relief='sunken')
 	frame_buttons.grid_columnconfigure(0, weight=1)
 	frame_buttons.grid_columnconfigure(1, weight=1)
 	frame_buttons.grid_columnconfigure(2, weight=1)
@@ -184,8 +214,12 @@ if __name__ == '__main__':
 	label_file_pattern = tkinter.Label(frame_entries, text="File pattern:", justify=tkinter.LEFT)
 	label_file_pattern.grid(row=1, column=0, sticky='w', pady=(10, 0), padx=(10, 20))
 
-	label_path = tkinter.Label(frame_entries, text="Library path:", justify=tkinter.LEFT)
+	label_path = tkinter.Label(frame_entries, text="Library directory:", justify=tkinter.LEFT)
 	label_path.grid(row=2, column=0, sticky='w', pady=(10, 10), padx=(10, 20))
+
+	library_path = tkinter.StringVar()
+	label_sel_path = tkinter.Label(frame_entries, textvariable=library_path, justify=tkinter.LEFT)
+	label_sel_path.grid(row=2, column=2, sticky='w', pady=(10, 10), padx=(0, 20))
 
 	status = tkinter.StringVar()
 	label_status = tkinter.Label(root, textvariable=status, justify=tkinter.LEFT)
@@ -196,31 +230,35 @@ if __name__ == '__main__':
 
 	entry_album_pattern = tkinter.Entry(frame_entries)
 	entry_album_pattern.insert(0, organizer.DIR_DEFAULT)
-	entry_album_pattern.grid(row=0, column=1, sticky='ew', pady=(10, 0), padx=(0, 20))
+	entry_album_pattern.grid(row=0, column=1, sticky='ew', pady=(10, 0), padx=(0, 20), columnspan=2)
 
 	entry_file_pattern = tkinter.Entry(frame_entries)
 	entry_file_pattern.insert(0, organizer.FILE_DEFAULT)
-	entry_file_pattern.grid(row=1, column=1, sticky='ew', pady=(10, 0), padx=(0, 20))
+	entry_file_pattern.grid(row=1, column=1, sticky='ew', pady=(10, 0), padx=(0, 20), columnspan=2)
 
-	entry_path = tkinter.Entry(frame_entries)
-	entry_path.insert(0, "D:\CodeProjects\Python\music_test_folder")
-	entry_path.grid(row=2, column=1, sticky='ew', pady=(10, 10), padx=(0, 20))
+	# entry_path = tkinter.Entry(frame_entries)
+	# entry_path.insert(0, "D:\CodeProjects\Python\music_test_folder")
+	# entry_path.grid(row=2, column=1, sticky='ew', pady=(10, 10), padx=(0, 20))
 
 	# ======== Buttons ========
 
-	# TODO disable buttons while different thread is working
+	btn_browse = tkinter.Button(frame_entries, text="Browse", width=10, command=lambda: browse(library_path))
+	btn_browse.grid(row=2, column=1, sticky='w', pady=(10, 10), padx=(0, 10))
+
 	progress = tkinter.DoubleVar()
 	progress_bar = ttk.Progressbar(root, orient=tkinter.HORIZONTAL, variable=progress, maximum=100)
 	progress_bar.grid(row=5, column=1, sticky='ew', padx=20)
 	progress_bar.grid_remove()
 
-	btn_organize = tkinter.Button(frame_buttons, text="Organize library", command=organize)
+	btn_organize = tkinter.Button(frame_buttons, text="Organize library", width=14,
+								  command=lambda: organize(library_path.get()))
 	btn_organize.grid(row=0, column=0)
 
-	btn_fetch_art = tkinter.Button(frame_buttons, text="Fetch album art", command=fetch_art)
+	btn_fetch_art = tkinter.Button(frame_buttons, text="Fetch album art", width=14,
+								   command=lambda: fetch_art(library_path.get()))
 	btn_fetch_art.grid(row=0, column=1)
 
-	btn_update_muspy = tkinter.Button(frame_buttons, text="Update Muspy", command=update_muspy)
+	btn_update_muspy = tkinter.Button(frame_buttons, text="Update Muspy", width=14, command=update_muspy)
 	btn_update_muspy.grid(row=0, column=2)
 
 	root.mainloop()

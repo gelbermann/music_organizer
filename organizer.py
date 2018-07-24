@@ -22,6 +22,8 @@ def organize(dir_path: str, dir_pattern: str = "", file_pattern: str = "", scrip
 	if script:
 		dir_pattern, file_pattern = get_patterns()
 
+	print("\nOrganizing directory: '{}'\n".format(dir_path))
+
 	total_files = sum([len(files) for path, dirs, files in os.walk(dir_path)])
 	files_done = 0
 
@@ -51,6 +53,8 @@ def organize(dir_path: str, dir_pattern: str = "", file_pattern: str = "", scrip
 							print("\t{}".format(error))
 			files_done += 1
 			yield files_done * 100 / total_files  # percent of files covered out of all files
+
+	print("\nDone organizing directory: '{}'\n".format(dir_path))
 
 
 def missing_tags(tag) -> bool:
@@ -213,6 +217,8 @@ def clear_remains(dir_path: str) -> None:
 
 	:param dir_path: parent directory path
 	"""
+	print("\nCleaning directory: '{}'\n".format(dir_path))
+
 	abs_path = os.path.abspath(dir_path)
 	for path, dirs, files in os.walk(abs_path):
 		for directory in dirs:
@@ -224,6 +230,7 @@ def clear_remains(dir_path: str) -> None:
 					print("\t{}".format(error))
 				else:
 					print("[!] Directory '{}' deleted successfully.".format(directory))
+	print("\nDone cleaning directory: '{}'\n".format(dir_path))
 
 
 def contains_no_audio(dir_path: str) -> bool:
@@ -256,9 +263,12 @@ def fetch_album_art(dir_path: str, script: bool = False):
 		else:
 			print()
 
+	print("\nFetching art for directory: '{}'\n".format(dir_path))
+
 	total_albums = 0
 	for _, _, files in os.walk(dir_path):  # can probably be achieved more efficiently
-		total_albums += 1 if [file for file in files if is_audio_file(file)] else 0
+		total_albums += 1 if [file for file in files
+							  if is_audio_file(file) and 'cover_art.jpg' not in files] else 0
 	done = 0
 
 	for url, path, tag in get_image_urls(dir_path):
@@ -279,6 +289,7 @@ def fetch_album_art(dir_path: str, script: bool = False):
 				print("[!] Album art successfully retrieved for:\t{}".format(path))
 		done += 1
 		yield done * 100 / total_albums
+	print("\nDone fetching art for directory: '{}'\n".format(dir_path))
 
 
 def get_image_urls(dir_path: str) -> tuple:
