@@ -2,22 +2,41 @@ import tkinter
 from tkinter import ttk
 import organizer
 from queue import Queue, Empty
-from threading import Thread
+from threading import Thread, current_thread
+
+DONE = 'DONE'
+
+
+# TODO consider using parallel workers to speed things up. Would it work, considering their task is an ordered one?
+# TODO is it possible to merge 2 worker classes? I think so: https://stackoverflow.com/questions/15540194/python-how-do-i-notify-that-a-thread-has-finished-to-another-class
+class OrganizeWorker(Thread):
+	def __init__(self, queue, callback=None, callback_args=None):
+		super().__init__()
+		self.queue = queue
+		self.callback = callback
+		self.callback_args = callback_args
+
+	def run(self):
+		dir_path, dir_pattern, file_pattern = self.queue.get()
+		for percent in organizer.organize(dir_path, dir_pattern, file_pattern):
+			# self.queue.put(percent)
+			update_progress_bar(percent)  # should worker thread be able to affect GUI thread?
+		self.queue.task_done()
+		# self.queue.put('DONE')
+		if self.callback is not None:
+			self.callback(self.callback_args)
 
 
 class DownloadWorker(Thread):
-	DONE = 'DONE'
-
 	def __init__(self, queue):
 		super().__init__()
 		self.queue = queue
 
 	def run(self):
 		dir_path = self.queue.get()
-		for percent in organizer.fetch_album_art(dir_path, self.queue):
-			self.queue.put(percent)
+		for percent in organizer.fetch_album_art(dir_path):
+			update_progress_bar(percent)
 		self.queue.task_done()
-		self.queue.put('DONE')
 
 
 def organize():
@@ -28,12 +47,18 @@ def organize():
 	if not entries_valid(dir_path, dir_pattern, file_pattern):
 		return
 
+	queue = Queue()
+	worker = OrganizeWorker(queue, callback=clean, callback_args=dir_path)
+	worker.daemon = True
+	worker.start()
 	progress_bar.grid()
-	status.set("Organizing...")
-	for percent in organizer.organize(dir_path, dir_pattern, file_pattern):
-		update_progress_bar(percent)
 	update_progress_bar(0)
+	status.set("Organizing...")
+	queue.put((dir_path, dir_pattern, file_pattern))
 
+
+def clean(dir_path: str):
+	update_progress_bar(0)
 	status.set("Removing empty directories...")
 	progress_bar.start()
 	organizer.clear_remains(dir_path)
@@ -67,19 +92,6 @@ def entries_valid(dir_path, *args):
 
 
 def fetch_art():
-	def check_queue():
-		try:
-			percent = queue.get_nowait()
-		except Empty:
-			root.after(100, check_queue)
-		else:
-			if percent == DownloadWorker.DONE:
-				status.set("Done!")
-				update_progress_bar(100)
-			else:
-				update_progress_bar(percent)
-				root.after(100, check_queue)
-
 	# set up GUI and variables for fetching operation
 	dir_path = entry_path.get().strip()
 	if not entries_valid(dir_path):
@@ -96,7 +108,21 @@ def fetch_art():
 
 	# begin thread work
 	queue.put(dir_path)
-	root.after(200, check_queue)
+	# root.after(100, check_queue, queue)
+
+
+def check_queue(queue: Queue, delay: int = 100):
+	try:
+		percent = queue.get_nowait()
+	except Empty:
+		root.after(delay, check_queue, queue)
+	else:
+		if percent == DONE:
+			status.set("Done!")
+			update_progress_bar(100)
+		else:
+			update_progress_bar(percent)
+			root.after(delay, check_queue, queue)
 
 
 def update_muspy():
@@ -122,8 +148,9 @@ if __name__ == '__main__':
 	root = tkinter.Tk()
 	root.title("Music Library Organizer")
 	root.geometry('570x420')
-	root.minsize(width=570, height=420)
-	root.maxsize(width=570, height=420)
+	# root.minsize(width=570, height=420)
+	# root.maxsize(width=570, height=420)
+	root.resizable(False, False)
 
 	# ======== Frames ========
 
@@ -181,6 +208,7 @@ if __name__ == '__main__':
 
 	# ======== Buttons ========
 
+	# TODO disable buttons while different thread is working
 	progress = tkinter.DoubleVar()
 	progress_bar = ttk.Progressbar(root, orient=tkinter.HORIZONTAL, variable=progress, maximum=100)
 	progress_bar.grid(row=5, column=1, sticky='ew', padx=20)

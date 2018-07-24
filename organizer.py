@@ -43,7 +43,7 @@ def organize(dir_path: str, dir_pattern: str = "", file_pattern: str = "", scrip
 						try:
 							os.rename(file_path, formatted_name)
 						except FileExistsError as error:
-							print("[ERROR] Couldn't rename file '{}' as it already exists.".format(formatted_name))
+							# print("[ERROR] Couldn't rename file '{}' as it already exists.".format(formatted_name))
 							print("\t{}".format(error))
 						# os.rename(file_path, file)
 						except OSError as error:
@@ -134,7 +134,8 @@ def create_directory(dir_path: str, dir_name: str) -> str:
 			os.makedirs(new_path)
 			print("[!] Directory '{}' created successfully.".format(dir_name))
 		else:
-			print('[!] Directory "{}" already exists, no action taken.'.format(dir_name))
+			# print('[!] Directory "{}" already exists, no action taken.'.format(dir_name))
+			pass
 	except (OSError, ValueError) as error:
 		# print(r'%s' % os.path.join(dir_path, dir_name))
 		print("[ERROR] Could not create directory: '{}'".format(os.path.join(dir_path, dir_name)))
@@ -281,7 +282,12 @@ def fetch_album_art(dir_path: str, script: bool = False):
 
 
 def get_image_urls(dir_path: str) -> tuple:
-	# TODO add docstring
+	"""
+	Gets image urls for every album art under given directory, including under subdirectories.
+
+	:param dir_path: given directory
+	:return: yields tuple that consists of: (error if occurs or url, url path, album tags)
+	"""
 	network = pylast.LastFMNetwork(api_key='d43c497febfef4ba166a51eca0932b90',
 								   api_secret='1ce6e93f6e2c1329262484f41901ad2c')
 	dir_path = os.path.abspath(dir_path)
