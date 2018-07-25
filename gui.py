@@ -7,6 +7,8 @@ from threading import Thread
 from platform import system
 from os import getlogin
 from os.path import isdir
+import urllib.request
+import getpass
 
 DONE = 'DONE'
 
@@ -121,18 +123,18 @@ def fetch_art(dir_path: str):
 	queue.put(dir_path)
 
 
-def check_queue(queue: Queue, delay: int = 100):
-	try:
-		percent = queue.get_nowait()
-	except Empty:
-		root.after(delay, check_queue, queue)
-	else:
-		if percent == DONE:
-			status.set("Done!")
-			update_progress_bar(100)
-		else:
-			update_progress_bar(percent)
-			root.after(delay, check_queue, queue)
+# def check_queue(queue: Queue, delay: int = 100):
+# 	try:
+# 		percent = queue.get_nowait()
+# 	except Empty:
+# 		root.after(delay, check_queue, queue)
+# 	else:
+# 		if percent == DONE:
+# 			status.set("Done!")
+# 			update_progress_bar(100)
+# 		else:
+# 			update_progress_bar(percent)
+# 			root.after(delay, check_queue, queue)
 
 
 def update_muspy():
@@ -148,10 +150,25 @@ def update_muspy():
 	# Best bet is to imitate the way beets use the muspy API, since on its own
 	# its documentation is bare and I can't seem to get it to work.
 
+
+	# ================= GET USER ARTISTS =================
+	# # TODO add error handling
+	# password_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
+	# api_url = 'https://muspy.com/api/1/'
+	# password_mgr.add_password(None, api_url, 'nivgmann@gmail.com', '22051994')  # TODO replace with identification box
+	# handler = urllib.request.HTTPBasicAuthHandler(password_mgr)
+	# opener = urllib.request.build_opener(handler)
+	# urllib.request.install_opener(opener)
+	#
+	# resp = urllib.request.urlopen('{}/{}/{}'.format(api_url, 'artists', '6pdr8vvquufgil5kk953z7cdnfu5ih'))
+	# resp_body = resp.read()
+	# print(resp_body.decode('utf-8'))
+
 	# temporary user notice
 	progress_bar.grid_remove()
 	label_status.grid()
 	status.set("Under development...")
+
 
 
 def toggle_interactables():

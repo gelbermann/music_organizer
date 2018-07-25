@@ -315,7 +315,7 @@ def get_image_urls(dir_path: str) -> tuple:
 					except Exception as error:
 						yield (error, path, tag)
 					else:
-						# yield tuple. tuple structure: (image url, final image path, album tags)
+						# yields tuple. tuple structure: (image url, final image path, album tags)
 						yield (image_url, os.path.join(path, "cover_art.jpg"), tag)
 
 
