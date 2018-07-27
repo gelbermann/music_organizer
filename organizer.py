@@ -304,7 +304,10 @@ def get_image_urls(dir_path: str) -> tuple:
 	dir_path = os.path.abspath(dir_path)
 	for path, dirs, files in os.walk(dir_path):
 		if not contains_no_audio(path) and "cover_art.jpg" not in files:
-			file = [file for file in files if is_audio_file(file)][0] if files else None  # get first audio file
+			try:
+				file = [file for file in files if is_audio_file(file)][0] if files else None  # get first audio file
+			except:
+				file = None
 			if file:
 				tag = generate_tag(os.path.join(path, file))
 				if tag:

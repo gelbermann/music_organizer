@@ -5,10 +5,14 @@ import organizer
 from queue import Queue, Empty
 from threading import Thread
 from platform import system
-from os import getlogin
-from os.path import isdir
-import urllib.request
-import getpass
+from os import getlogin, walk
+from os.path import isdir, isfile
+
+# from apiclient.discovery import build
+# from googleapiclient.http import MediaFileUpload
+# from httplib2 import Http
+# from oauth2client import file, client, tools
+# from magic import Magic
 
 DONE = 'DONE'
 
@@ -39,7 +43,6 @@ class DownloadWorker(Thread):
 		dir_path = self.queue.get()
 		for percent in organizer.fetch_album_art(dir_path):
 			update_progress_bar(percent)
-			print(percent)
 		self.queue.task_done()
 		status.set("Done!")
 		update_progress_bar(100)
@@ -123,18 +126,19 @@ def fetch_art(dir_path: str):
 	queue.put(dir_path)
 
 
-# def check_queue(queue: Queue, delay: int = 100):
-# 	try:
-# 		percent = queue.get_nowait()
-# 	except Empty:
-# 		root.after(delay, check_queue, queue)
-# 	else:
-# 		if percent == DONE:
-# 			status.set("Done!")
-# 			update_progress_bar(100)
-# 		else:
-# 			update_progress_bar(percent)
-# 			root.after(delay, check_queue, queue)
+def check_queue(queue: Queue, delay: int = 100):
+	""" deprecated """
+	try:
+		percent = queue.get_nowait()
+	except Empty:
+		root.after(delay, check_queue, queue)
+	else:
+		if percent == DONE:
+			status.set("Done!")
+			update_progress_bar(100)
+		else:
+			update_progress_bar(percent)
+			root.after(delay, check_queue, queue)
 
 
 def update_muspy():
@@ -152,6 +156,8 @@ def update_muspy():
 
 
 	# ================= GET USER ARTISTS =================
+	# import urllib.request
+	# import getpass
 	# # TODO add error handling
 	# password_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
 	# api_url = 'https://muspy.com/api/1/'
@@ -173,7 +179,7 @@ def update_muspy():
 
 def toggle_interactables():
 	interactables = [entry_album_pattern, entry_file_pattern,
-					 btn_browse, btn_organize, btn_fetch_art, btn_update_muspy]
+					 btn_browse, btn_organize, btn_fetch_art]
 	for intr in interactables:
 		if intr['state'] == 'normal':
 			intr.config(state=tkinter.DISABLED)
@@ -193,12 +199,34 @@ def browse(dir_path: tkinter.StringVar):
 		dir_path.set(user_selection)
 
 
+# def upload_to_drive(dir_path: str):
+# 	# set up the Drive v3 API
+# 	SCOPES = 'https://www.googleapis.com/drive'
+# 	storage = file.Storage('token.json')
+# 	creds = storage.get()
+# 	if not creds or creds.invalid:
+# 		flow = client.flow_from_clientsecrets('credentials.json', SCOPES)
+# 		creds = tools.run_flow(flow, storage)
+# 	service = build('drive', 'v3', http=creds.authorize(Http()))
+# 	# mime = Magic(mime=True)
+#
+# 	# use API
+# 	for path, dirs, files in walk(dir_path):
+# 		for file_ in files:
+# 			file_metadata = {'name': file_}
+# 			media = MediaFileUpload('{}/{}'.format(path, file_),
+# 									# mimetype=mime.from_file(file))
+# 									mimetype="audio/{}".format(file_.split('.')[-1]))
+# 			resp = service.files().create(body=file_metadata,
+# 										  media_body=media,
+# 										  fields='id').execute()
+# 			print("File ID: {}".format(resp.get('id')))
+
+
 if __name__ == '__main__':
 	root = tkinter.Tk()
 	root.title("Music Library Organizer")
 	root.geometry('570x420')
-	# root.minsize(width=570, height=420)
-	# root.maxsize(width=570, height=420)
 	root.resizable(False, False)
 
 	# ======== Frames ========
@@ -212,7 +240,7 @@ if __name__ == '__main__':
 	frame_buttons.grid(row=4, column=1, sticky='nsew', padx=20, pady=20)
 	frame_buttons.grid_columnconfigure(0, weight=1)
 	frame_buttons.grid_columnconfigure(1, weight=1)
-	frame_buttons.grid_columnconfigure(2, weight=1)
+	# frame_buttons.grid_columnconfigure(2, weight=1)
 
 	# ======== Labels ========
 
@@ -253,10 +281,6 @@ if __name__ == '__main__':
 	entry_file_pattern.insert(0, organizer.FILE_DEFAULT)
 	entry_file_pattern.grid(row=1, column=1, sticky='ew', pady=(10, 0), padx=(0, 20), columnspan=2)
 
-	# entry_path = tkinter.Entry(frame_entries)
-	# entry_path.insert(0, "D:\CodeProjects\Python\music_test_folder")
-	# entry_path.grid(row=2, column=1, sticky='ew', pady=(10, 10), padx=(0, 20))
-
 	# ======== Buttons ========
 
 	btn_browse = tkinter.Button(frame_entries, text="Browse", width=10, command=lambda: browse(library_path))
@@ -275,7 +299,10 @@ if __name__ == '__main__':
 								   command=lambda: fetch_art(library_path.get()))
 	btn_fetch_art.grid(row=0, column=1)
 
-	btn_update_muspy = tkinter.Button(frame_buttons, text="Update Muspy", width=14, command=update_muspy)
-	btn_update_muspy.grid(row=0, column=2)
+	# btn_update_muspy = tkinter.Button(frame_buttons, text="Update Muspy", width=14, command=update_muspy)
+	# btn_update_muspy.grid(row=0, column=2)
+
+	# btn_upload_drive = tkinter.Button(frame_buttons, text="Upload to Drive", width=14, command=lambda: upload_to_drive(library_path.get()))
+	# btn_upload_drive.grid(row=0, column=2)
 
 	root.mainloop()
