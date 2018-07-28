@@ -3,6 +3,8 @@ from tinytag import TinyTag, TinyTagException
 from shutil import move, SameFileError, rmtree
 import pylast
 import urllib.request as request
+from sys import argv
+import argparse
 
 DIR_DEFAULT = '%A/%y - %a'
 FILE_DEFAULT = '%tn - %t'
@@ -318,23 +320,28 @@ def get_image_urls(dir_path: str) -> tuple:
 					except Exception as error:
 						yield (error, path, tag)
 					else:
-						# yields tuple. tuple structure: (image url, final image path, album tags)
+						# yields (image url, final image path, album tags) tuple
 						yield (image_url, os.path.join(path, "cover_art.jpg"), tag)
 
 
-def main():
-	# root = "D:/Niv/Music"
-	root = "D:\CodeProjects\Python\music_test_folder"
-	print("*** WARNING! DO NOT CONTINUE BEFORE CLOSING ALL OPEN FILES IN RELEVANT FOLDER! ***")
-	print()
+def main(arg_list):
+	if arg_list:
+		parser = argparse.ArgumentParser(description='Organize and fetch album art for your music library.')
+		parser.add_argument('-d', '--directory', nargs='+', required=True)
+		args = parser.parse_args()
+		root = args.directory[0]
+	else:
+		root = "D:\CodeProjects\Python\music_test_folder"
 
-	organize(root, script=True)
+	for percent in organize(root, script=True):
+		pass
 	clear_remains(root)
-	fetch_album_art(root)
+	for percent in fetch_album_art(root, script=True):
+		pass
 
 
 if __name__ == '__main__':
-	main()
+	main(argv[1:])
 
 # ========= Last.fm API account ========= #
 # Application name	music_organizer

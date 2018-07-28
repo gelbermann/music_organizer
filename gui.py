@@ -8,12 +8,6 @@ from platform import system
 from os import getlogin, walk
 from os.path import isdir, isfile
 
-# from apiclient.discovery import build
-# from googleapiclient.http import MediaFileUpload
-# from httplib2 import Http
-# from oauth2client import file, client, tools
-# from magic import Magic
-
 DONE = 'DONE'
 
 
@@ -95,13 +89,6 @@ def entries_valid(dir_path: str, *args):
 	if dir_path == "":
 		status.set("Cannot use empty pattern or path.")
 		return False
-	# TODO remove cases:
-	elif not organizer.os.path.isdir(dir_path):
-		status.set("Path is not a directory, or is invalid.")
-		return False
-	elif organizer.contains_no_audio(dir_path):
-		status.set("Directory contains no audio files! Are you sure you got the correct path?")
-		return False
 	return True
 
 
@@ -141,42 +128,6 @@ def check_queue(queue: Queue, delay: int = 100):
 			root.after(delay, check_queue, queue)
 
 
-def update_muspy():
-	# api_url = 'https://muspy.com/api/1/artists'
-	# # api_endpoint = 'artists/'
-	#
-	# response = requests.request('GET', api_url, auth=('6pdr8vvquufgil5kk953z7cdnfu5ih', '22051994'))
-	# print(response)
-	#
-	# ==== status ====
-	# Seems like a lot of work.
-	# Relevant links: https://www.one-tab.com/page/6tYsdNNDQA2tFhg7kkaNvw
-	# Best bet is to imitate the way beets use the muspy API, since on its own
-	# its documentation is bare and I can't seem to get it to work.
-
-
-	# ================= GET USER ARTISTS =================
-	# import urllib.request
-	# import getpass
-	# # TODO add error handling
-	# password_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
-	# api_url = 'https://muspy.com/api/1/'
-	# password_mgr.add_password(None, api_url, 'nivgmann@gmail.com', '22051994')  # TODO replace with identification box
-	# handler = urllib.request.HTTPBasicAuthHandler(password_mgr)
-	# opener = urllib.request.build_opener(handler)
-	# urllib.request.install_opener(opener)
-	#
-	# resp = urllib.request.urlopen('{}/{}/{}'.format(api_url, 'artists', '6pdr8vvquufgil5kk953z7cdnfu5ih'))
-	# resp_body = resp.read()
-	# print(resp_body.decode('utf-8'))
-
-	# temporary user notice
-	progress_bar.grid_remove()
-	label_status.grid()
-	status.set("Under development...")
-
-
-
 def toggle_interactables():
 	interactables = [entry_album_pattern, entry_file_pattern,
 					 btn_browse, btn_organize, btn_fetch_art]
@@ -197,30 +148,6 @@ def browse(dir_path: tkinter.StringVar):
 	)
 	if isdir(user_selection):
 		dir_path.set(user_selection)
-
-
-# def upload_to_drive(dir_path: str):
-# 	# set up the Drive v3 API
-# 	SCOPES = 'https://www.googleapis.com/drive'
-# 	storage = file.Storage('token.json')
-# 	creds = storage.get()
-# 	if not creds or creds.invalid:
-# 		flow = client.flow_from_clientsecrets('credentials.json', SCOPES)
-# 		creds = tools.run_flow(flow, storage)
-# 	service = build('drive', 'v3', http=creds.authorize(Http()))
-# 	# mime = Magic(mime=True)
-#
-# 	# use API
-# 	for path, dirs, files in walk(dir_path):
-# 		for file_ in files:
-# 			file_metadata = {'name': file_}
-# 			media = MediaFileUpload('{}/{}'.format(path, file_),
-# 									# mimetype=mime.from_file(file))
-# 									mimetype="audio/{}".format(file_.split('.')[-1]))
-# 			resp = service.files().create(body=file_metadata,
-# 										  media_body=media,
-# 										  fields='id').execute()
-# 			print("File ID: {}".format(resp.get('id')))
 
 
 if __name__ == '__main__':
@@ -298,11 +225,5 @@ if __name__ == '__main__':
 	btn_fetch_art = tkinter.Button(frame_buttons, text="Fetch album art", width=14,
 								   command=lambda: fetch_art(library_path.get()))
 	btn_fetch_art.grid(row=0, column=1)
-
-	# btn_update_muspy = tkinter.Button(frame_buttons, text="Update Muspy", width=14, command=update_muspy)
-	# btn_update_muspy.grid(row=0, column=2)
-
-	# btn_upload_drive = tkinter.Button(frame_buttons, text="Upload to Drive", width=14, command=lambda: upload_to_drive(library_path.get()))
-	# btn_upload_drive.grid(row=0, column=2)
 
 	root.mainloop()
