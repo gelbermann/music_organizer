@@ -1,2 +1,4 @@
 __pycache__
 .idea/
+dist/
+music_test_folder/

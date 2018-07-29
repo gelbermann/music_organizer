@@ -38,21 +38,10 @@ def organize(dir_path: str, dir_pattern: str = "", file_pattern: str = "", scrip
 				if tag:
 					dir_name = generate_name(tag, dir_pattern)
 					dst_path = create_directory(dir_path, dir_name)
-					move_file(file_path, dst_path)
-					if not missing_tags(tag):
-						file_ext = file.split('.')[-1]
-						formatted_name = "{}.{}".format(generate_name(tag, file_pattern), file_ext)
-						formatted_name = os.path.join(dst_path, formatted_name.replace('\0', ''))
-						file_path = os.path.join(dst_path, file)
-						try:
-							os.rename(file_path, formatted_name)
-						except FileExistsError as error:
-							# print("[ERROR] Couldn't rename file '{}' as it already exists.".format(formatted_name))
-							print("\t{}".format(error))
-						# os.rename(file_path, file)
-						except OSError as error:
-							print("[ERROR] Couldn't rename file '{}'.".format(formatted_name))
-							print("\t{}".format(error))
+					file_ext = file.split('.')[-1]
+					formatted_name = "{}.{}".format(generate_name(tag, file_pattern), file_ext)
+					formatted_name = os.path.join(dst_path, formatted_name.replace('\0', ''))
+					move_file(file_path, os.path.join(dst_path, formatted_name))
 			files_done += 1
 			yield files_done * 100 / total_files  # percent of files covered out of all files
 
@@ -105,11 +94,11 @@ def generate_tag(file_path: str):
 		tag = TinyTag.get(file_path)
 	except TinyTagException as error:
 		print("[ERROR] Unknown error occurred reading tags from file: '{}'".format(file_name))
-		print("\t{}".format(error))
+		print("\t{}\t{}".format(error.__class__, error))
 		tag = None
 	except Exception as error:
 		print("[ERROR] Unknown error occurred reading tags from file: '{}'".format(file_path))
-		print("\t{}".format(error))
+		print("\t{}\t{}".format(error.__class__, error))
 		tag = None
 	return tag
 
@@ -145,7 +134,7 @@ def create_directory(dir_path: str, dir_name: str) -> str:
 	except (OSError, ValueError) as error:
 		# print(r'%s' % os.path.join(dir_path, dir_name))
 		print("[ERROR] Could not create directory: '{}'".format(os.path.join(dir_path, dir_name)))
-		print("\t{}".format(error))
+		print("\t{}\t{}".format(error.__class__, error))
 	return str(new_path)
 
 
@@ -202,9 +191,9 @@ def move_file(file_path: str, dst_path: str) -> None:
 		pass
 	except OSError as error:
 		print("[ERROR] Could not move file to destination: {}".format(dst_path))
-		print("\t{}".format(error))
+		print("\t{}\t{}".format(error.__class__, error))
 	else:
-		_, tail = os.path.split(file_path)
+		_, tail = os.path.split(dst_path)
 		print("[!] File '{}' moved successfully.".format(tail))
 
 
@@ -229,7 +218,7 @@ def clear_remains(dir_path: str) -> None:
 					rmtree(os.path.join(path, directory))
 				except Exception as error:
 					print("[ERROR] Could not delete directory: '{}'".format(directory))
-					print("\t{}".format(error))
+					print("\t{}\t{}".format(error.__class__, error))
 				else:
 					print("[!] Directory '{}' deleted successfully.".format(directory))
 	print("\nDone cleaning directory: '{}'\n".format(dir_path))
@@ -282,7 +271,7 @@ def fetch_album_art(dir_path: str, script: bool = False):
 				request.urlretrieve(url, path)
 			except (pylast.MalformedResponseError, pylast.NetworkError) as error:
 				print("[ERROR] Could not download album art for:\t'{}'".format(path))
-				print("\t{}".format(error))
+				print("\t{}\t{}".format(error.__class__, error))
 			except Exception as error:
 				print("[ERROR] Unknown error occurred while retrieving album art for:")
 				print("\t{}".format(path))
@@ -331,7 +320,7 @@ def main(arg_list):
 		args = parser.parse_args()
 		root = args.directory[0]
 	else:
-		root = "D:\CodeProjects\Python\music_test_folder"
+		root = "D:\CodeProjects\Python\music_organizer\music_test_folder"
 
 	for percent in organize(root, script=True):
 		pass
