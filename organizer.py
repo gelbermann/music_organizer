@@ -1,13 +1,20 @@
 import os
-from tinytag import TinyTag, TinyTagException
 from shutil import move, SameFileError, rmtree
 import pylast
-import urllib.request as request
+import urllib.request
 from sys import argv
 import argparse
+import mutagen
 
+# constants
 DIR_DEFAULT = '%A/%y - %a'
 FILE_DEFAULT = '%tn - %t'
+ARTIST = 'TPE1'
+ALBUM = 'TALB'
+TITLE = 'TIT2'
+TRACK = 'TRCK'
+YEAR = 'TDRC'
+ALBUM_ART = 'APIC'
 
 
 def organize(dir_path: str, dir_pattern: str = "", file_pattern: str = "", script: bool = False):
@@ -32,34 +39,23 @@ def organize(dir_path: str, dir_pattern: str = "", file_pattern: str = "", scrip
 	dir_path = os.path.abspath(dir_path)
 	for path, dirs, files in os.walk(dir_path):
 		for file in files:
-			if is_audio_file(file):
-				file_path = os.path.join(path, file).replace('\0', '')
+			# if is_audio_file(file):
+			file_path = os.path.join(path, file).replace('\0', '')
+			try:
 				tag = generate_tag(file_path)
-				if tag:
-					dir_name = generate_name(tag, dir_pattern)
-					dst_path = create_directory(dir_path, dir_name)
-					file_ext = file.split('.')[-1]
-					formatted_name = "{}.{}".format(generate_name(tag, file_pattern), file_ext)
-					formatted_name = os.path.join(dst_path, formatted_name.replace('\0', ''))
-					move_file(file_path, os.path.join(dst_path, formatted_name))
+			except mutagen.MutagenError:
+				continue
+			if tag:
+				dir_name = generate_name(tag, dir_pattern)
+				dst_path = create_directory(dir_path, dir_name)
+				file_ext = file.split('.')[-1]
+				formatted_name = "{}.{}".format(generate_name(tag, file_pattern), file_ext)
+				formatted_name = os.path.join(dst_path, formatted_name.replace('\0', ''))
+				move_file(file_path, os.path.join(dst_path, formatted_name))
 			files_done += 1
 			yield files_done * 100 / total_files  # percent of files covered out of all files
 
 	print("\nDone organizing directory: '{}'\n".format(dir_path))
-
-
-def missing_tags(tag) -> bool:
-	"""
-	Checks whether any of the important tags are missing from a tags object.
-
-	:param tag: tags object
-	:return: True if 'artist', 'album', 'year', 'track' or 'title' tag is missing. False otherwise.
-	"""
-	return tag.artist is not None \
-		   and tag.album is not None \
-		   and tag.year is not None \
-		   and tag.track is not None \
-		   and tag.title is not None
 
 
 def get_patterns() -> (str, str):
@@ -91,8 +87,8 @@ def generate_tag(file_path: str):
 	"""
 	_, file_name = os.path.split(file_path)
 	try:
-		tag = TinyTag.get(file_path)
-	except TinyTagException as error:
+		tag = mutagen.File(file_path)
+	except mutagen.MutagenError as error:
 		print("[ERROR] Unknown error occurred reading tags from file: '{}'".format(file_name))
 		print("\t{}\t{}".format(error.__class__, error))
 		tag = None
@@ -111,7 +107,7 @@ def is_audio_file(file: str):
 	:return: True if file is audio file, False otherwise
 	"""
 	extensions = ('mp3', 'mp4', 'wmv', 'mpg', 'mpeg', 'm3u', 'mid',
-				  'wma', 'midi', 'wav', 'm4a')  # TODO Replace id3reader with more advanced id3 tags reader
+				  'wma', 'midi', 'wav', 'm4a')
 	return file.endswith(extensions)
 
 
@@ -132,7 +128,6 @@ def create_directory(dir_path: str, dir_name: str) -> str:
 			# print('[!] Directory "{}" already exists, no action taken.'.format(dir_name))
 			pass
 	except (OSError, ValueError) as error:
-		# print(r'%s' % os.path.join(dir_path, dir_name))
 		print("[ERROR] Could not create directory: '{}'".format(os.path.join(dir_path, dir_name)))
 		print("\t{}\t{}".format(error.__class__, error))
 	return str(new_path)
@@ -154,11 +149,11 @@ def generate_name(tag, pattern: str) -> str:
 	:return: generated name
 	"""
 	return pattern \
-		.replace('%A', remove_forbidden_chars(tag.artist) if tag.artist else "Various Artists") \
-		.replace('%a', remove_forbidden_chars(tag.album) if tag.album else "Untitled Album") \
-		.replace('%tn', str(tag.track).zfill(2) if tag.track else "") \
-		.replace('%t', remove_forbidden_chars(tag.title) if tag.title else "Untitled") \
-		.replace('%y', str(tag.year) if tag.year else "")
+		.replace('%A', remove_forbidden_chars(str(tag[ARTIST])) if tag[ARTIST] else "Various Artists") \
+		.replace('%a', remove_forbidden_chars(str(tag[ALBUM])) if tag[ALBUM] else "Untitled Album") \
+		.replace('%tn', str(tag[TRACK]).zfill(2) if tag[TRACK] else "") \
+		.replace('%t', remove_forbidden_chars(str(tag[TITLE])) if tag[TITLE] else "Untitled") \
+		.replace('%y', str(tag[YEAR]) if tag[YEAR] else "")
 
 
 def remove_forbidden_chars(string: str) -> str:
@@ -186,15 +181,18 @@ def move_file(file_path: str, dst_path: str) -> None:
 	:param dst_path: destination directory's path, as string
 	"""
 	try:
+		_, file_name = os.path.split(file_path)
 		move(file_path, dst_path.strip())
 	except SameFileError:
 		pass
 	except OSError as error:
-		print("[ERROR] Could not move file to destination: {}".format(dst_path))
-		print("\t{}\t{}".format(error.__class__, error))
+		if isinstance(error, FileNotFoundError):
+			print("[!] File '{}' already in destination, no action taken.".format(file_name))
+		else:
+			print("[ERROR] Could not move file to destination: {}".format(dst_path))
+			print("\t{}\t{}".format(error.__class__, error))
 	else:
-		_, tail = os.path.split(dst_path)
-		print("[!] File '{}' moved successfully.".format(tail))
+		print("[!] File '{}' moved successfully.".format(file_name))
 
 
 def clear_remains(dir_path: str) -> None:
@@ -259,25 +257,32 @@ def fetch_album_art(dir_path: str, script: bool = False):
 	total_albums = 0
 	for _, _, files in os.walk(dir_path):  # can probably be achieved more efficiently
 		total_albums += 1 if [file for file in files
-							  if is_audio_file(file) and 'cover_art.jpg' not in files] else 0
+							  if is_audio_file(file) and "folder.jpg" not in files] else 0
 	done = 0
 
-	for url, path, tag in get_image_urls(dir_path):
+	for url, path, tags in get_image_urls(dir_path):
 		if issubclass(type(url), Exception):  # if url is an error object
-			print("[ERROR] Could not download album art for:\t'{}'".format(tag))
+			print("[ERROR] Could not download album art for:\t'{}'".format(path))
 			print("\t{}\t{}".format(url.__class__, url))
 		else:
 			try:
-				request.urlretrieve(url, path)
-			except (pylast.MalformedResponseError, pylast.NetworkError) as error:
-				print("[ERROR] Could not download album art for:\t'{}'".format(path))
+				urllib.request.urlretrieve(url, path)
+			except (urllib.request.HTTPError, FileNotFoundError) as error:
+				print("[ERROR] Could not download album art:\t'{}'".format(path))
 				print("\t{}\t{}".format(error.__class__, error))
 			except Exception as error:
-				print("[ERROR] Unknown error occurred while retrieving album art for:")
+				print("[ERROR] Unknown error occurred while retrieving album art:")
 				print("\t{}".format(path))
 				print("\t{}\t{}".format(error.__class__, error))
 			else:
-				print("[!] Album art successfully retrieved for:\t{}".format(path))
+				with open(path, 'rb') as album_art:
+					data = album_art.read()
+					for tag in tags:
+						tag[ALBUM_ART] = mutagen.id3.APIC(encoding=3, mime='image/jpeg', type=3,
+														  desc=u'Cover', data=data)
+						tag.save()
+						print("== album art set for '{}' ==".format(tag[TITLE]))
+				print("[!] Album art successfully retrieved:\t{}".format(path))
 		done += 1
 		yield done * 100 / total_albums
 	print("\nDone fetching art for directory: '{}'\n".format(dir_path))
@@ -294,23 +299,20 @@ def get_image_urls(dir_path: str) -> tuple:
 								   api_secret='1ce6e93f6e2c1329262484f41901ad2c')
 	dir_path = os.path.abspath(dir_path)
 	for path, dirs, files in os.walk(dir_path):
-		if not contains_no_audio(path) and "cover_art.jpg" not in files:
-			try:
-				file = [file for file in files if is_audio_file(file)][0] if files else None  # get first audio file
-			except:
-				file = None
-			if file:
-				tag = generate_tag(os.path.join(path, file))
-				if tag:
-					try:
-						album = network.get_album(tag.artist, tag.album)
-						image_url = album.get_cover_image()  # by default returns 300x300 sized image
-						image_url = image_url.replace('300x300', '600x600')
-					except Exception as error:
-						yield (error, path, tag)
-					else:
-						# yields (image url, final image path, album tags) tuple
-						yield (image_url, os.path.join(path, "cover_art.jpg"), tag)
+		if not contains_no_audio(path) and "folder.jpg" not in files:
+			tags = []
+			for file in files:
+				tags.append(generate_tag(os.path.join(path, file)))
+			if tags:
+				try:
+					album = network.get_album(tags[0][ARTIST], tags[0][ALBUM])
+					image_url = album.get_cover_image()  # by default returns 300x300 sized image
+					image_url = image_url.replace('300x300', '600x600')
+				except Exception as error:
+					yield (error, path, None)
+				else:
+					# yields (image url, final image path, album tags) tuple
+					yield (image_url, os.path.join(path, "folder.jpg"), tags)
 
 
 def main(arg_list):
