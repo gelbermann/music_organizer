@@ -281,7 +281,6 @@ def fetch_album_art(dir_path: str, script: bool = False):
 						tag[ALBUM_ART] = mutagen.id3.APIC(encoding=3, mime='image/jpeg', type=3,
 														  desc=u'Cover', data=data)
 						tag.save()
-						print("== album art set for '{}' ==".format(tag[TITLE]))
 				print("[!] Album art successfully retrieved:\t{}".format(path))
 		done += 1
 		yield done * 100 / total_albums
