@@ -26,10 +26,10 @@ The default formats for directory and file names are:
 
 Upcoming features
 -----------------
-* [muspy](https://muspy.com/) integration
-* `Browse` button instead of path textbox
+* [muspy](https://muspy.com/) integration (Currently on-hold)
+* [AcoustID](https://acoustid.org/) integration for identifying un-tagged audio files in library
     
 3rd party resources
 -------------------
 * [pylast](https://pypi.org/project/pylast/)
-* [tinytag](https://pypi.org/project/tinytag/)
+* [mutagen](https://mutagen.readthedocs.io/en/latest/)
